@@ -1,1 +1,93 @@
-
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>OG City — Prototype 0.1</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101820;font-family:system-ui,Arial;color:#fff}
+#game{display:block;width:100vw;height:100dvh;background:#47764d;touch-action:none}
+.hud{position:fixed;inset:12px 12px auto;display:flex;justify-content:space-between;gap:10px;pointer-events:none}
+.panel{background:#101820d9;border:1px solid #ffffff24;border-radius:12px;padding:9px 12px;box-shadow:0 4px 18px #0005}
+#help{font-size:12px;color:#d5e4dc;line-height:1.45}
+#toast{position:fixed;left:50%;top:76px;transform:translateX(-50%);background:#101820e8;border:1px solid #ffffff30;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+.controls{position:fixed;inset:auto 18px 18px;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
+.pad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:5px;pointer-events:auto}
+.ctrl{border:1px solid #ffffff55;background:#101820b8;color:white;border-radius:12px;font-size:20px;touch-action:none}
+.ctrl:active{background:#4c8e66}
+#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
+#action{width:76px;height:76px;border-radius:50%;font-size:12px;font-weight:700;pointer-events:auto}
+@media(min-width:800px){.controls{opacity:.45}.pad{display:none}#action{display:none}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud">
+ <div class="panel"><strong>OG CITY</strong><div style="font-size:11px;color:#a9cbb3">PROTOTIPO 0.1 · EXPLORACIÓN</div></div>
+ <div class="panel" id="help">Mover: WASD / flechas<br>Acción: E · En celular: controles</div>
+</div>
+<div id="toast"></div>
+<div class="controls">
+ <div class="pad">
+  <button class="ctrl" id="up">▲</button><button class="ctrl" id="left">◀</button><button class="ctrl" id="down">▼</button><button class="ctrl" id="right">▶</button>
+ </div>
+ <button class="ctrl" id="action">ACCIÓN</button>
+</div>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+let W=0,H=0,dpr=1;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',resize);resize();
+const world={w:2200,h:1600};
+const roads=[
+{x:0,y:280,w:2200,h:150},{x:0,y:800,w:2200,h:150},
+{x:370,y:0,w:150,h:1600},{x:1080,y:0,w:150,h:1600},{x:1770,y:0,w:150,h:1600}
+];
+const buildings=[];
+for(let x=45;x<2150;x+=230)for(let y of [55,485,975,1190]){
+ if(roads.some(r=>x<r.x+r.w&&x+160>r.x&&y<r.y+r.h&&y+135>r.y))continue;
+ buildings.push({x,y,w:150,h:125,c:['#b66b50','#71869a','#c49a5c','#8c779e'][Math.floor((x+y)%4)]});
+}
+const player={x:690,y:620,r:13,speed:220};
+const keys={};let near=false;
+const cars=[{x:700,y:350,c:'#e6c84c'},{x:1390,y:870,c:'#d65c55'},{x:500,y:870,c:'#58a6a6'}];
+function collides(x,y){return buildings.some(b=>x+player.r>b.x&&x-player.r<b.x+b.w&&y+player.r>b.y&&y-player.r<b.y+b.h)}
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.opacity=0,1800)}
+function action(){near=cars.some(c=>Math.hypot(c.x-player.x,c.y-player.y)<58);toast(near?'Vehículo detectado. ¡Próximamente podrás conducir!':'Explorá la ciudad y acercate a un vehículo.')}
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault();if(e.key.toLowerCase()==='e')action()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function bind(id,k){const el=document.getElementById(id);const on=e=>{e.preventDefault();keys[k]=true};const off=e=>{e.preventDefault();keys[k]=false};el.addEventListener('pointerdown',on);['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,off))}
+bind('up','arrowup');bind('down','arrowdown');bind('left','arrowleft');bind('right','arrowright');
+document.getElementById('action').addEventListener('pointerdown',e=>{e.preventDefault();action()});
+function draw(){
+ const camX=Math.max(0,Math.min(world.w-W,player.x-W/2)),camY=Math.max(0,Math.min(world.h-H,player.y-H/2));
+ ctx.clearRect(0,0,W,H);ctx.save();ctx.translate(-camX,-camY);
+ ctx.fillStyle='#47764d';ctx.fillRect(0,0,world.w,world.h);
+ // parques y parcelas
+ for(let x=0;x<world.w;x+=230)for(let y=0;y<world.h;y+=220){ctx.fillStyle='#4d8054';ctx.fillRect(x+8,y+8,205,195)}
+ // calles
+ roads.forEach(r=>{ctx.fillStyle='#343c43';ctx.fillRect(r.x,r.y,r.w,r.h);ctx.strokeStyle='#d9c77b';ctx.lineWidth=3;ctx.setLineDash([24,22]);ctx.beginPath();if(r.w>r.h){ctx.moveTo(r.x,r.y+r.h/2);ctx.lineTo(r.x+r.w,r.y+r.h/2)}else{ctx.moveTo(r.x+r.w/2,r.y);ctx.lineTo(r.x+r.w/2,r.y+r.h)}ctx.stroke();ctx.setLineDash([])});
+ // edificios
+ buildings.forEach(b=>{ctx.fillStyle='#26352d';ctx.fillRect(b.x+7,b.y+9,b.w,b.h);ctx.fillStyle=b.c;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.fillStyle='#e9d6aa';for(let wx=14;wx<b.w-12;wx+=38)for(let wy=16;wy<b.h-12;wy+=36)ctx.fillRect(b.x+wx,b.y+wy,17,15);ctx.fillStyle='#303b43';ctx.fillRect(b.x+b.w/2-17,b.y+b.h-30,34,30)});
+ // árboles
+ for(let x=30;x<world.w;x+=230)for(let y=30;y<world.h;y+=220){if(!roads.some(r=>x>r.x-20&&x<r.x+r.w+20&&y>r.y-20&&y<r.y+r.h+20)){ctx.fillStyle='#31543a';ctx.beginPath();ctx.arc(x+175,y+165,16,0,Math.PI*2);ctx.fill();ctx.fillStyle='#6e9b59';ctx.beginPath();ctx.arc(x+175,y+159,13,0,Math.PI*2);ctx.fill()}}
+ // autos
+ cars.forEach(c=>{ctx.fillStyle='#17252c';ctx.fillRect(c.x-25,c.y-13,50,26);ctx.fillStyle=c.c;ctx.fillRect(c.x-22,c.y-11,44,22);ctx.fillStyle='#b9d2d5';ctx.fillRect(c.x-8,c.y-9,16,18);ctx.fillStyle='#f8e9a8';ctx.fillRect(c.x+18,c.y-8,4,5)});
+ // jugador
+ ctx.fillStyle='#17232a';ctx.beginPath();ctx.ellipse(player.x,player.y+10,12,6,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#f0c6a0';ctx.beginPath();ctx.arc(player.x,player.y-5,7,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#3ba6d8';ctx.fillRect(player.x-8,player.y+1,16,15);
+ ctx.fillStyle='#182a35';ctx.fillRect(player.x-7,player.y+14,5,7);ctx.fillRect(player.x+2,player.y+14,5,7);
+ ctx.restore();
+}
+let last=performance.now();
+function loop(now){let dt=Math.min((now-last)/1000,.04);last=now;let dx=0,dy=0;
+ if(keys.w||keys.arrowup)dy--;if(keys.s||keys.arrowdown)dy++;if(keys.a||keys.arrowleft)dx--;if(keys.d||keys.arrowright)dx++;
+ if(dx||dy){const n=Math.hypot(dx,dy);dx=dx/n*player.speed*dt;dy=dy/n*player.speed*dt;let nx=player.x+dx,ny=player.y+dy;if(!collides(nx,player.y))player.x=nx;if(!collides(player.x,ny))player.y=ny;player.x=Math.max(15,Math.min(world.w-15,player.x));player.y=Math.max(15,Math.min(world.h-15,player.y))}
+ draw();requestAnimationFrame(loop)}
+toast('¡Bienvenido a OG City!');requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
